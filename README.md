@@ -6,31 +6,34 @@ and aggregates them every minute, finally logging total unique requests.
 
 ##  Tech Stack
 
-- Java 21
-- Spring Boot 4.x
-- Redis (Memurai on Windows)
-- H2 Memory DB
-- Spring Scheduler
-- JPA + Hibernate
+- Java 21  Core application
+- Spring Boot 4.x  REST API + scheduler
+- Redis (Memurai on Windows) Fast ID storage + deduplication
+- H2 Memory DB  Local testing
+- Spring Scheduler  1-minute aggregation loop 
+- JPA + Hibernate   Persistence layer
 
 ##  How to Run
+1.Start Spring Boot application
+mvn spring-boot:run
+Runs on: http://localhost:8082
 
-1. Install & start Redis
+2. Install & start Redis
    redis-server
    Start Redis Server (Memurai)
-2.opem cmd as run as admin
-cd "C:\Program Files\Memurai"
-memurai.exe
-
+   
+3.opem cmd as run as admin
+  cd "C:\Program Files\Memurai"
+  memurai.exe
+Runs at localhost:6379
 ## To run 2nd instance (if wanted for load balancer testing):
 
  mvn spring-boot:run -Dspring.profiles.active=2
 Runs on http://localhost:8082
 
-
-3 API Usage
+## 3 API Usage
 GET /api/space/accept?id=10
-GET /api/space/accept?id=10&endpoint=http://example.com   <-- external call
+GET /api/space/accept?id=10&endpoint=http://example.com   for external
 
 Output:
 processed               # first time http://localhost:8081/api/space/accept?id=500
@@ -73,3 +76,17 @@ Logs result like:
 2025-11-30T08:10 → 152 unique IDs
 
 Saves + POST summary if callbacks exist (Extension-1)
+
+## Aggregation (Extension-1)
+Every minute scheduler executes:
+{
+  "minuteStart": "2025-11-30T12:35",
+  "uniqueIdCount": 154
+}
+If webhook was provided → a POST request is sent.
+Retries are safe-handled (no infinite retry).
+ ## Extension-2: Multi-Instance Support
+Redis SET + setIfAbsent(lock) ensures:
+1. No duplicate aggregation
+2.Only one instance acts as leader
+3. Horizontal scaling supported
